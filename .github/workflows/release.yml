@@ -1,9 +1,9 @@
 name: Release
 
-# Quando si pubblica una release su GitHub, compila il jar e lo allega alla release.
+# Si avvia spingendo un tag vX.Y: compila il jar, lo prova sull'esempio e crea la release con il jar allegato.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -23,8 +23,20 @@ jobs:
         run: mvn -B -q package
       - name: Prova sull'esempio
         run: java -jar target/odin-doc.jar genera esempio/esempio.properties --output=target/esempio.pdf
-      - name: Allega il jar alla release
-        if: github.event_name == 'release'
+      - name: Crea la release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" target/odin-doc.jar --clobber
+        run: |
+          cat > note.md <<'NOTE'
+          Scarica `odin-doc.jar` (serve Java 11 o superiore) e lancia:
+
+          ```
+          java -jar odin-doc.jar genera    cliente.properties
+          java -jar odin-doc.jar pacchetto cliente.properties
+          java -jar odin-doc.jar conferma  cliente.properties
+          ```
+
+          Istruzioni complete nel README.
+          NOTE
+          gh release create "${GITHUB_REF_NAME}" target/odin-doc.jar --title "OdinDoc ${GITHUB_REF_NAME#v}" --notes-file note.md
