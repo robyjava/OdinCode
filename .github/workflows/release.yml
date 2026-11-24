@@ -1,7 +1,10 @@
 name: Release
 
-# Si avvia spingendo un tag vX.Y: compila il jar, lo prova sull'esempio e crea la release con il jar allegato.
+# Si avvia quando si pubblica una release (anche dal telefono, con un tag nuovo vX.Y)
+# oppure spingendo un tag vX.Y: compila il jar, lo prova sull'esempio e lo allega alla release.
 on:
+  release:
+    types: [published]
   push:
     tags: ['v*']
   workflow_dispatch:
@@ -23,8 +26,8 @@ jobs:
         run: mvn -B -q package
       - name: Prova sull'esempio
         run: java -jar target/odin-doc.jar genera esempio/esempio.properties --output=target/esempio.pdf
-      - name: Crea la release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Crea la release o allega il jar
+        if: github.event_name != 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -39,4 +42,9 @@ jobs:
 
           Istruzioni complete nel README.
           NOTE
-          gh release create "${GITHUB_REF_NAME}" target/odin-doc.jar --title "OdinDoc ${GITHUB_REF_NAME#v}" --notes-file note.md
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" target/odin-doc.jar --clobber
+          else
+            gh release create "$TAG" target/odin-doc.jar --title "OdinDoc ${TAG#v}" --notes-file note.md
+          fi
