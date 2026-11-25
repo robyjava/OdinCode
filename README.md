@@ -27,7 +27,7 @@ java -jar odin-doc.jar pacchetto acme.properties             prepara per l'AI so
 java -jar odin-doc.jar conferma  acme.properties [nome]      la modifica al codice non cambia la descrizione: la segna come aggiornata
 ```
 
-La configurazione di un cliente sta in un file `.properties`: parti da `cliente.properties.esempio`.
+La configurazione di un cliente sta in un file `.properties`: parti da uno degli esempi nella cartella `configurazioni/` (vedi `docs/CONFIGURAZIONE.md`).
 
 ## Come si lavora
 

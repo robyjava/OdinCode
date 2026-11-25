@@ -6,3 +6,4 @@ target/
 da-descrivere.md
 *.properties
 !esempio/esempio.properties
+!configurazioni/*.properties
