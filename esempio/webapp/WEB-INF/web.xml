@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app>
+  <servlet>
+    <servlet-name>ordini</servlet-name>
+    <servlet-class>it.acme.vendite.web.OrdineServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ordini</servlet-name>
+    <url-pattern>/ordini</url-pattern>
+  </servlet-mapping>
+</web-app>

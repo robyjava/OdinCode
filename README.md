@@ -2,7 +2,7 @@
 
 > **Per iniziare leggi il [Manuale di utilizzo](MANUALE.md).**
 
-Genera la documentazione in PDF di un'applicazione partendo da:
+Genera il **manuale utente** e il **manuale del programmatore** in PDF di un'applicazione partendo da:
 
 - gli **script DDL** Oracle (tutti in una cartella): tabelle, colonne, chiavi, indici, commenti, viste, sequence, trigger, package
 - i **sorgenti Java** che usano il database con **JDBC puro**
@@ -44,7 +44,7 @@ Se il pacchetto è troppo grande, usa `pacchetto.max=30` e fallo a rate.
 
 **Quando il codice cambia**
 
-1. `genera`: il capitolo 8 elenca le descrizioni da rivedere, cioè quelle il cui codice è cambiato.
+1. `genera`: il capitolo 9 del manuale del programmatore elenca le descrizioni da rivedere, cioè quelle il cui codice è cambiato.
 2. Se la modifica non tocca il senso della descrizione: `conferma` (tutte) o `conferma NomeClasse` (una sola).
 3. Altrimenti `pacchetto`: dentro ci sono solo le classi e le tabelle cambiate, quindi pochi token.
 

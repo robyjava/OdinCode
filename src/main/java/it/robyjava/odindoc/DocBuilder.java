@@ -35,47 +35,56 @@ final class DocBuilder {
 
     // ================================================================ PDF
 
+    /** Manuale del programmatore. */
     byte[] pdf() {
         PdfWriter b = new PdfWriter();
         overview(b);
         architecture(b);
+        interfaceChapter(b);
         entryPoints(b);
         components(b);
         database(b);
         crud(b);
         attention(b);
         docStatus(b);
+        return assemble(b, "Manuale del programmatore");
+    }
 
+    private byte[] assemble(PdfWriter b, String subtitle) {
         PdfWriter front = new PdfWriter();
-        cover(front);
+        cover(front, subtitle);
         int tocPages = PdfWriter.tocPages(b.marks);
         int off = 1 + tocPages;
         front.newPage();
         front.text(PdfWriter.ML, front.y - 18, Font.BOLD, 18, "Indice", PdfWriter.ACCENT);
         front.y -= 40;
         for (PdfWriter.Mark m : b.marks) front.tocLine(m.level, m.title, m.page, String.valueOf(m.page + off + 1), m.y);
-        return PdfWriter.build(front, b, title + (client == null ? "" : " - " + client));
+        return PdfWriter.build(front, b, subtitle + " - " + title + (client == null ? "" : " - " + client));
     }
 
-    private void cover(PdfWriter p) {
+    private void cover(PdfWriter p, String subtitle) {
         p.newPage();
         float top = PdfWriter.PH - 230;
         p.rect(0, top - 10, PdfWriter.PW, 150, PdfWriter.ACCENT, null, 0);
-        p.text(PdfWriter.ML, top + 95, Font.REG, 11, "Documentazione tecnica", PdfWriter.ACCENT2);
+        p.text(PdfWriter.ML, top + 95, Font.REG, 11, subtitle, PdfWriter.ACCENT2);
         float y = top + 62;
         for (String l : PdfWriter.wrap(Font.BOLD, 26, title, PdfWriter.CW)) { p.text(PdfWriter.ML, y, Font.BOLD, 26, l, PdfWriter.WHITE); y -= 30; }
         if (client != null) p.text(PdfWriter.ML, top + 8, Font.REG, 13, client, PdfWriter.WHITE);
         p.y = top - 60;
         List<String[]> rows = new ArrayList<>();
         rows.add(new String[]{"Generata il", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))});
-        rows.add(new String[]{"Tabelle", String.valueOf(schema.tables.size())});
-        rows.add(new String[]{"Viste", String.valueOf(schema.views.size())});
-        rows.add(new String[]{"Classi Java", String.valueOf(project.classes.size())});
-        rows.add(new String[]{"Metodi con SQL", String.valueOf(project.allMethods().stream().filter(m -> !m.sql.isEmpty()).count())});
-        rows.add(new String[]{"Query individuate", String.valueOf(project.allMethods().stream().mapToInt(m -> m.sql.size()).sum())});
+        if (subtitle.startsWith("Manuale utente")) {
+            rows.add(new String[]{"Schermate", String.valueOf(userScreens().size())});
+        } else {
+            rows.add(new String[]{"Tabelle", String.valueOf(schema.tables.size())});
+            rows.add(new String[]{"Viste", String.valueOf(schema.views.size())});
+            rows.add(new String[]{"Classi Java", String.valueOf(project.classes.size())});
+            rows.add(new String[]{"Schermate", String.valueOf(project.screens.size())});
+            rows.add(new String[]{"Query individuate", String.valueOf(project.allMethods().stream().mapToInt(m -> m.sql.size()).sum())});
+        }
         p.table(null, new float[]{0.3f, 0.7f}, rows, new Font[]{Font.BOLD, Font.REG});
         p.y = PdfWriter.MB + 30;
-        p.text(PdfWriter.ML, p.y, Font.IT, 8, "Generata automaticamente da OdinDoc a partire da DDL e sorgenti Java. Le parti descrittive provengono dai file in descrizioni/.", PdfWriter.GRAY);
+        p.text(PdfWriter.ML, p.y, Font.IT, 8, "Generato automaticamente da OdinDoc a partire dal codice. Le parti descrittive provengono dai file in descrizioni/.", PdfWriter.GRAY);
     }
 
     private void overview(PdfWriter b) {
@@ -112,7 +121,7 @@ final class DocBuilder {
     }
 
     private void entryPoints(PdfWriter b) {
-        b.heading(1, "3. Punti di ingresso");
+        b.heading(1, "4. Punti di ingresso");
         b.para("Metodi da cui parte l'esecuzione (main, servlet, servizi REST, job). Per ognuno le tabelle raggiunte seguendo le chiamate tra classi: C=inserimento, R=lettura, U=modifica, D=cancellazione.", Font.IT, 8.5f, PdfWriter.GRAY);
         List<MethodInfo> eps = entries();
         if (eps.isEmpty()) { b.para("Nessun punto di ingresso riconosciuto automaticamente."); return; }
@@ -122,7 +131,7 @@ final class DocBuilder {
     }
 
     private void components(PdfWriter b) {
-        b.heading(1, "4. Componenti");
+        b.heading(1, "5. Componenti");
         for (ClassInfo c : project.classes.values()) {
             b.heading(2, c.name);
             StringBuilder info = new StringBuilder(c.kind + " - " + (c.pkg.isEmpty() ? "package di default" : c.pkg) + " - " + c.lines + " righe");
@@ -171,7 +180,7 @@ final class DocBuilder {
     }
 
     private void database(PdfWriter b) {
-        b.heading(1, "5. Base dati");
+        b.heading(1, "6. Base dati");
         Map<String, List<String>> children = new TreeMap<>();
         for (Table t : schema.tables.values())
             for (ForeignKey fk : t.fks) children.computeIfAbsent(fk.refTable, k -> new ArrayList<>()).add(t.name);
@@ -265,7 +274,7 @@ final class DocBuilder {
     }
 
     private void crud(PdfWriter b) {
-        b.heading(1, "6. Matrice CRUD");
+        b.heading(1, "7. Matrice CRUD");
         b.para("Per ogni tabella, le classi che la usano e con quali operazioni (C=inserimento, R=lettura, U=modifica, D=cancellazione).", Font.IT, 8.5f, PdfWriter.GRAY);
         List<String[]> rows = new ArrayList<>();
         for (Map.Entry<String, Map<MethodInfo, Set<Character>>> e : usage.entrySet()) {
@@ -283,7 +292,7 @@ final class DocBuilder {
     }
 
     private void attention(PdfWriter b) {
-        b.heading(1, "7. Punti di attenzione");
+        b.heading(1, "8. Punti di attenzione");
         b.para("Segnalazioni automatiche da verificare: non sono per forza errori.", Font.IT, 8.5f, PdfWriter.GRAY);
         List<String> unused = new ArrayList<>();
         for (Table t : schema.tables.values()) {
@@ -352,7 +361,7 @@ final class DocBuilder {
     }
 
     private void docStatus(PdfWriter b) {
-        b.heading(1, "8. Stato delle descrizioni");
+        b.heading(1, "9. Stato delle descrizioni");
         b.para("Le descrizioni funzionali si trovano nella cartella descrizioni/. Ognuna porta l'impronta del codice per cui è stata scritta: se il codice cambia, la descrizione finisce qui come da rivedere. Il comando 'pacchetto' prepara per l'AI solo questi elementi.", Font.IT, 8.5f, PdfWriter.GRAY);
         List<String[]> rows = new ArrayList<>();
         for (ClassInfo c : project.classes.values()) {
@@ -362,6 +371,10 @@ final class DocBuilder {
         for (Table t : schema.tables.values()) {
             DescStore.Status s = desc.status(DescStore.tableKey(t.name), Util.hash(t.canonical()));
             if (s != DescStore.Status.AGGIORNATA) rows.add(new String[]{"tabella", t.name, label(s)});
+        }
+        for (Screen sc : userScreens()) {
+            DescStore.Status s = desc.status(DescStore.screenKey(sc.id), sc.hash);
+            if (s != DescStore.Status.AGGIORNATA) rows.add(new String[]{"schermata", screenTitle(sc), label(s)});
         }
         if (rows.isEmpty()) b.note("Tutte le descrizioni sono aggiornate.", PdfWriter.OK_BG, PdfWriter.OK);
         else b.table(new String[]{"Tipo", "Elemento", "Stato"}, new float[]{0.12f, 0.68f, 0.2f}, rows, null);
@@ -471,14 +484,329 @@ final class DocBuilder {
             DescStore.Status s = desc.status(DescStore.tableKey(t.name), Util.hash(t.canonical()));
             r[s == DescStore.Status.AGGIORNATA ? 0 : s == DescStore.Status.DA_RIVEDERE ? 1 : 2]++;
         }
+        for (Screen sc : userScreens()) {
+            DescStore.Status s = desc.status(DescStore.screenKey(sc.id), sc.hash);
+            r[s == DescStore.Status.AGGIORNATA ? 0 : s == DescStore.Status.DA_RIVEDERE ? 1 : 2]++;
+        }
         return r;
+    }
+
+    // ================================================================ interfaccia (programmatore)
+
+    private void interfaceChapter(PdfWriter b) {
+        b.heading(1, "3. Interfaccia utente");
+        if (project.screens.isEmpty()) {
+            b.para("Nessuna schermata Swing o pagina web individuata.", Font.IT, 8.5f, PdfWriter.GRAY);
+            return;
+        }
+        b.para("Schermate Swing e pagine web, con i comandi che offrono, i metodi che li gestiscono e le tabelle che raggiungono. È la mappa schermata -> codice -> dati.", Font.IT, 8.5f, PdfWriter.GRAY);
+        List<String[]> rows = new ArrayList<>();
+        for (Screen sc : project.screens.values())
+            rows.add(new String[]{"**" + screenTitle(sc), sc.kind, sc.cls != null ? sc.cls.fqcn : relFile(sc), String.valueOf(sc.fields.size()), String.valueOf(sc.actions.size())});
+        b.table(new String[]{"Schermata", "Tipo", "Classe o file", "Campi", "Comandi"}, new float[]{0.27f, 0.14f, 0.43f, 0.08f, 0.08f}, rows, null);
+        for (Screen sc : project.screens.values()) {
+            if (sc.actions.isEmpty()) continue;
+            b.heading(2, screenTitle(sc));
+            b.para(sc.kind + " - " + (sc.cls != null ? sc.cls.fqcn : relFile(sc)), Font.IT, 8.3f, PdfWriter.GRAY);
+            List<String[]> r = new ArrayList<>();
+            for (UiAction a : sc.actions) {
+                String handlers = a.targets.stream().map(MethodInfo::shortId).collect(Collectors.joining(", "));
+                if (handlers.isEmpty() && a.url != null) handlers = a.url;
+                if (handlers.isEmpty() && !a.opens.isEmpty()) handlers = "apre " + a.opens.stream().map(project.screens::get).filter(Objects::nonNull).map(this::screenTitle).collect(Collectors.joining(", "));
+                if (handlers.isEmpty() && a.closes) handlers = "chiude la finestra";
+                r.add(new String[]{"**" + a.label, handlers, tablesText(actionTables(a))});
+            }
+            b.table(new String[]{"Comando", "Gestito da", "Tabelle raggiunte"}, new float[]{0.25f, 0.37f, 0.38f}, r, null);
+        }
+    }
+
+    // ================================================================ manuale utente
+
+    byte[] userPdf() {
+        PdfWriter b = new PdfWriter();
+        List<Screen> screens = userScreens();
+        b.heading(1, "1. Introduzione");
+        String intro = desc.text(DescStore.USER_INTRO);
+        if (intro != null) markdown(b, intro);
+        else if (desc.overview != null) markdown(b, desc.overview);
+        else b.note("Introduzione ancora da scrivere: il comando 'pacchetto' la prepara per l'AI (file descrizioni/utente/_introduzione.md).", PdfWriter.LIGHT, PdfWriter.GRAY);
+        b.para("Questo manuale descrive " + screens.size() + (screens.size() == 1 ? " schermata" : " schermate") + " dell'applicazione: per ognuna trovi a cosa serve, i campi da compilare, i comandi disponibili e i messaggi che possono comparire.");
+
+        b.heading(1, "2. Come ci si muove");
+        boolean any = false;
+        for (Screen sc : screens) {
+            if (sc.menus.isEmpty()) continue;
+            any = true;
+            b.heading(3, "Menu di " + screenTitle(sc));
+            for (MenuNode mn : sc.menus) menu(b, mn, 0);
+        }
+        List<Screen> web = screens.stream().filter(x -> x.id.startsWith("web/")).collect(Collectors.toList());
+        if (!web.isEmpty()) {
+            any = true;
+            b.heading(3, "Pagine");
+            List<Screen> starts = web.stream().filter(x -> x.linkedFrom.isEmpty()).collect(Collectors.toList());
+            if (starts.isEmpty()) starts = web;
+            for (Screen sc : starts) {
+                String to = sc.links.stream().map(project.screens::get).filter(Objects::nonNull).map(this::screenTitle).collect(Collectors.joining(", "));
+                b.bullet(screenTitle(sc) + (to.isEmpty() ? "" : ": da qui si va a " + to), 0);
+            }
+        }
+        List<Screen> swingOpen = screens.stream().filter(x -> x.id.startsWith("swing/") && !x.links.isEmpty()).collect(Collectors.toList());
+        for (Screen sc : swingOpen) {
+            any = true;
+            String to = sc.links.stream().map(project.screens::get).filter(Objects::nonNull).map(this::screenTitle).collect(Collectors.joining(", "));
+            b.bullet("Da " + screenTitle(sc) + " si apre: " + to, 0);
+        }
+        if (!any) b.para("La navigazione tra le schermate non è stata ricavata automaticamente dal codice.", Font.IT, 8.5f, PdfWriter.GRAY);
+
+        b.heading(1, "3. Le schermate");
+        for (Screen sc : screens) {
+            b.heading(2, screenTitle(sc));
+            b.para(capital(sc.kind), Font.IT, 8.3f, PdfWriter.GRAY);
+            String key = DescStore.screenKey(sc.id);
+            DescStore.Status st = desc.status(key, sc.hash);
+            if (st != DescStore.Status.MANCANTE) {
+                if (st == DescStore.Status.DA_RIVEDERE)
+                    b.note("La schermata è cambiata dopo che questa descrizione è stata scritta: va ricontrollata.", PdfWriter.WARN_BG, PdfWriter.WARN);
+                markdown(b, desc.text(key));
+                b.space(4);
+            } else {
+                b.para(autoIntro(sc));
+            }
+            if (!sc.headings.isEmpty()) {
+                b.heading(3, "Sezioni");
+                for (String h : sc.headings) b.bullet(h, 0);
+            }
+            List<UiField> fields = sc.fields.stream().filter(f -> f.label != null && !f.kind.equals("tabella")).collect(Collectors.toList());
+            if (!fields.isEmpty()) {
+                b.heading(3, "Campi");
+                List<String[]> r = new ArrayList<>();
+                for (UiField f : fields) r.add(new String[]{"**" + f.label, f.kind});
+                b.table(new String[]{"Campo", "Tipo"}, new float[]{0.6f, 0.4f}, r, null);
+            }
+            for (List<String> cols : sc.columns) {
+                b.heading(3, "Elenco");
+                b.para("Colonne mostrate: " + String.join(", ", cols));
+            }
+            List<UiAction> cmds = sc.actions.stream().filter(a -> !a.kind.equals("caricamento")).collect(Collectors.toList());
+            if (!cmds.isEmpty()) {
+                b.heading(3, "Comandi");
+                for (UiAction a : cmds) {
+                    String eff = actionEffect(a);
+                    b.bullet(a.label + (a.kind.equals("voce di menu") ? " (menu)" : "") + (eff.isEmpty() ? "" : ": " + eff), 0);
+                }
+            }
+            if (!sc.messages.isEmpty()) {
+                b.heading(3, "Messaggi che possono comparire");
+                for (String m : sc.messages) b.bullet("«" + m + "»", 0);
+            }
+            if (!sc.linkedFrom.isEmpty()) {
+                b.para("Ci si arriva da: " + sc.linkedFrom.stream().map(project.screens::get).filter(Objects::nonNull).map(this::screenTitle).collect(Collectors.joining(", ")), Font.REG, 8.8f, PdfWriter.BLACK);
+            }
+            Map<String, Set<Character>> data = new TreeMap<>();
+            for (UiAction a : sc.actions) actionTables(a).forEach((t, o) -> data.computeIfAbsent(t, k -> new TreeSet<>()).addAll(o));
+            b.note("Per il supporto: " + (sc.cls != null ? "classe " + sc.cls.fqcn : "file " + relFile(sc))
+                    + (data.isEmpty() ? "" : " - dati: " + tablesText(data)), PdfWriter.LIGHT, PdfWriter.GRAY);
+        }
+
+        int ch = 4;
+        List<String[]> gloss = glossary();
+        if (!gloss.isEmpty()) {
+            b.heading(1, ch++ + ". Glossario dei codici");
+            b.para("Significato dei codici, stati e indicatori che si incontrano nelle schermate.", Font.IT, 8.5f, PdfWriter.GRAY);
+            b.table(new String[]{"Dato", "Codice", "Significato"}, new float[]{0.3f, 0.2f, 0.5f}, gloss, null);
+        }
+        List<String[]> msgs = new ArrayList<>();
+        for (Screen sc : screens) for (String m : sc.messages) msgs.add(new String[]{m, screenTitle(sc)});
+        if (!msgs.isEmpty()) {
+            b.heading(1, ch++ + ". Indice dei messaggi");
+            b.para("Tutti i messaggi che il programma può mostrare, con la schermata in cui compaiono. Utile per il supporto.", Font.IT, 8.5f, PdfWriter.GRAY);
+            msgs.sort(Comparator.comparing(x -> x[0].toLowerCase(Locale.ROOT)));
+            b.table(new String[]{"Messaggio", "Schermata"}, new float[]{0.65f, 0.35f}, msgs, null);
+        }
+        return assemble(b, "Manuale utente");
+    }
+
+    private void menu(PdfWriter b, MenuNode mn, int level) {
+        String eff = mn.action == null ? "" : actionEffect(mn.action);
+        b.bullet(mn.label + (eff.isEmpty() ? "" : ": " + eff), Math.min(level, 3));
+        for (MenuNode c : mn.children) menu(b, c, level + 1);
+    }
+
+    List<Screen> userScreens() {
+        // prima le schermate da cui si parte (menu principale, pagine iniziali), poi le altre
+        return project.screens.values().stream().filter(s -> !s.kind.equals("frammento di pagina"))
+                .sorted(Comparator.comparingInt((Screen s) -> s.menus.isEmpty() ? 1 : 0)
+                        .thenComparingInt(s -> s.linkedFrom.isEmpty() ? 0 : 1)
+                        .thenComparingInt(s -> s.id.startsWith("swing/") ? 0 : 1)
+                        .thenComparing(this::screenTitle))
+                .collect(Collectors.toList());
+    }
+
+    String screenTitle(Screen s) {
+        if (s.title != null && !s.title.isEmpty()) return s.title;
+        if (!s.headings.isEmpty()) return s.headings.get(0);
+        if (s.cls != null) {
+            String n = s.cls.name.replaceAll("(Frame|Dialog|Panel|Form|Window|View|Gui|UI|Ui)$", "");
+            String h = UiAnalyzer.humanize(n.isEmpty() ? s.cls.name : n);
+            return h == null ? s.cls.name : h;
+        }
+        String f = s.id.substring(s.id.lastIndexOf('/') + 1).replaceAll("\\.[a-z]+$", "");
+        String h = UiAnalyzer.humanize(f);
+        return h == null ? f : h;
+    }
+
+    private String relFile(Screen s) {
+        return s.id.startsWith("web/") ? s.id.substring(4) : s.file;
+    }
+
+    private static String capital(String s) {
+        return s == null || s.isEmpty() ? "" : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private String autoIntro(Screen sc) {
+        Map<String, Set<Character>> data = new TreeMap<>();
+        for (UiAction a : sc.actions) actionTables(a).forEach((t, o) -> data.computeIfAbsent(t, k -> new TreeSet<>()).addAll(o));
+        StringBuilder sb = new StringBuilder("Questa " + (sc.kind.startsWith("pannello") ? "sezione" : sc.kind.contains("pagina") ? "pagina" : "finestra"));
+        if (!data.isEmpty()) sb.append(" lavora su: ").append(data.keySet().stream().map(this::friendlyTable).collect(Collectors.joining(", "))).append('.');
+        else sb.append(" fa parte dell'interfaccia dell'applicazione.");
+        sb.append(" La descrizione completa di come si usa non è ancora stata scritta.");
+        return sb.toString();
+    }
+
+    /** Descrizione in parole semplici di cosa fa un comando. */
+    String actionEffect(UiAction a) {
+        List<String> parts = new ArrayList<>();
+        Map<String, Set<Character>> t = actionTables(a);
+        String[][] verbs = {{"C", "registra"}, {"U", "aggiorna"}, {"D", "elimina"}, {"R", "consulta"}};
+        for (String[] v : verbs) {
+            List<String> names = new ArrayList<>();
+            t.forEach((tb, ops) -> { if (ops.contains(v[0].charAt(0))) names.add(friendlyTable(tb)); });
+            if (!names.isEmpty()) parts.add(v[1] + " " + joinAnd(names));
+        }
+        for (String o : a.opens) if (project.screens.containsKey(o)) parts.add("apre " + screenTitle(project.screens.get(o)));
+        if (a.closes) parts.add("chiude la finestra");
+        String s = String.join("; ", parts);
+        return s;
+    }
+
+    private static String joinAnd(List<String> l) {
+        if (l.size() <= 1) return String.join("", l);
+        return String.join(", ", l.subList(0, l.size() - 1)) + " e " + l.get(l.size() - 1);
+    }
+
+    Map<String, Set<Character>> actionTables(UiAction a) {
+        Map<String, Set<Character>> out = new TreeMap<>();
+        a.directTables.forEach((k, v) -> out.computeIfAbsent(k, x -> new TreeSet<>()).addAll(v));
+        for (MethodInfo m : a.targets) reach(m).forEach((k, v) -> out.computeIfAbsent(k, x -> new TreeSet<>()).addAll(v));
+        return out;
+    }
+
+    /** Nome comprensibile di una tabella: commento breve se c'è, altrimenti il nome in minuscolo. */
+    String friendlyTable(String t) {
+        Table tb = schema.table(t);
+        String d = desc.text(DescStore.tableKey(t));
+        String c = tb != null && tb.comment != null ? tb.comment : null;
+        String cand = c != null ? c : d != null ? Util.firstSentence(d.replaceAll("(?m)^#.*$", "")) : null;
+        if (cand != null && cand.length() <= 45 && !cand.contains("\n")) return cand.replaceAll("\\.$", "").toLowerCase(Locale.ITALIAN);
+        return t.replaceFirst("^(V|T|TB|TAB|VW|ANA|ANAG)_(?=[A-Z])", "").toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    /** Codici e significati: tabelle di decodifica, valori letti dal DB, commenti tipo "S = attivo, N = disattivo". */
+    private List<String[]> glossary() {
+        List<String[]> out = new ArrayList<>();
+        java.util.regex.Pattern code = java.util.regex.Pattern.compile("(\\w{1,4})\\s*[=:]\\s*([^,;=]{2,40})");
+        for (Table t : schema.tables.values()) {
+            if (!t.lookupRows.isEmpty() && t.lookupHead.size() >= 2) {
+                boolean first = true;
+                for (String[] r : t.lookupRows) {
+                    out.add(new String[]{first ? "**" + friendlyTable(t.name) : "", r[0], r.length > 1 ? r[1] : ""});
+                    first = false;
+                }
+            }
+            for (Column c : t.columns) {
+                if (c.comment == null) continue;
+                java.util.regex.Matcher m = code.matcher(c.comment);
+                List<String[]> found = new ArrayList<>();
+                while (m.find()) found.add(new String[]{m.group(1), m.group(2).trim()});
+                if (found.size() < 2) continue;
+                boolean first = true;
+                String label = UiAnalyzer.humanize(c.name.toLowerCase(Locale.ROOT).replace("flg_", "").replace("cod_", ""));
+                for (String[] f : found) {
+                    out.add(new String[]{first ? "**" + label + " (" + friendlyTable(t.name) + ")" : "", f[0], f[1]});
+                    first = false;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Metodi raggiungibili da un insieme di metodi seguendo le chiamate. */
+    static Set<MethodInfo> closure(Collection<MethodInfo> start) {
+        Set<MethodInfo> seen = new LinkedHashSet<>();
+        Deque<MethodInfo> todo = new ArrayDeque<>(start);
+        while (!todo.isEmpty()) {
+            MethodInfo m = todo.poll();
+            if (seen.add(m)) todo.addAll(m.calls);
+        }
+        return seen;
+    }
+
+    private List<String> userItems(String descDir) {
+        List<String> items = new ArrayList<>();
+        if (desc.text(DescStore.USER_INTRO) == null) {
+            StringBuilder sb = new StringBuilder("## Introduzione al manuale utente - DA SCRIVERE\n\n");
+            sb.append("- File da scrivere: `").append(descDir).append('/').append(DescStore.USER_INTRO).append(".md` (senza riga hash)\n");
+            sb.append("- Scrivi una pagina per chi usa il programma: a cosa serve l'applicazione, chi la usa, quali sono le attività principali e da quale schermata si parte.\n");
+            sb.append("- Schermate: ").append(userScreens().stream().map(this::screenTitle).collect(Collectors.joining(", "))).append('\n');
+            items.add(sb.toString());
+        }
+        List<Screen> list = new ArrayList<>(userScreens());
+        list.sort(Comparator.comparingInt((Screen x) -> desc.status(DescStore.screenKey(x.id), x.hash) == DescStore.Status.DA_RIVEDERE ? 0 : 1));
+        for (Screen sc : list) {
+            String key = DescStore.screenKey(sc.id);
+            DescStore.Status st = desc.status(key, sc.hash);
+            if (st == DescStore.Status.AGGIORNATA) continue;
+            StringBuilder sb = new StringBuilder();
+            sb.append("## Schermata \"").append(screenTitle(sc)).append("\" - ").append(st == DescStore.Status.MANCANTE ? "DA SCRIVERE" : "DA RIVEDERE").append(" (manuale utente)\n\n");
+            sb.append("- File da scrivere: `").append(descDir).append('/').append(key).append(".md`\n");
+            sb.append("- Prima riga del file: `hash: ").append(sc.hash).append("`\n");
+            sb.append("- Tipo: ").append(sc.kind).append('\n');
+            if (!sc.fields.isEmpty()) sb.append("- Campi: ").append(sc.fields.stream().map(f -> f.label + " (" + f.kind + ")").collect(Collectors.joining("; "))).append('\n');
+            for (UiAction a : sc.actions) {
+                String eff = actionEffect(a);
+                sb.append("- Comando \"").append(a.label).append("\"").append(eff.isEmpty() ? "" : ": " + eff).append('\n');
+            }
+            if (!sc.messages.isEmpty()) sb.append("- Messaggi: ").append(sc.messages.stream().map(m -> "«" + m + "»").collect(Collectors.joining("; "))).append('\n');
+            if (st == DescStore.Status.DA_RIVEDERE) sb.append("\nDescrizione attuale da aggiornare:\n\n> ").append(desc.text(key).replace("\n", "\n> ")).append('\n');
+            String src = sc.source == null ? "" : sc.source;
+            String[] lines = src.split("\n");
+            if (lines.length > 400) src = String.join("\n", Arrays.copyOf(lines, 400)) + "\n... (tagliato)";
+            sb.append("\nCodice della schermata:\n\n```").append(sc.id.startsWith("web/") ? "jsp" : "java").append('\n').append(src).append("\n```\n");
+            // codice dei metodi che gestiscono i comandi (fuori dalla schermata)
+            Set<ClassInfo> extra = new LinkedHashSet<>();
+            for (UiAction a : sc.actions) for (MethodInfo m : a.targets) if (m.owner != sc.cls) extra.add(m.owner);
+            for (ClassInfo c : extra) {
+                if (extra.size() > 4) break;
+                sb.append("\nCodice di ").append(c.name).append(" (gestisce i comandi):\n\n```java\n").append(c.source).append("\n```\n");
+            }
+            items.add(sb.toString());
+        }
+        return items;
     }
 
     // ================================================================ pacchetto per l'AI
 
     /** Prepara un file markdown con SOLO gli elementi da descrivere, da dare in pasto all'AI. */
     String packageForAi(int max, String descDir) {
+        return packageForAi(max, descDir, "tutti");
+    }
+
+    String packageForAi(int max, String descDir, String which) {
         List<String> items = new ArrayList<>();
+        boolean user = !which.startsWith("prog"), prog = !which.startsWith("ut");
+        if (user) items.addAll(userItems(descDir));
+        if (prog) {
         // prima le classi da rivedere, poi le mancanti con SQL, poi le altre mancanti, poi le tabelle
         List<ClassInfo> cls = new ArrayList<>(project.classes.values());
         cls.sort(Comparator.comparingInt((ClassInfo c) -> desc.status(DescStore.classKey(c.fqcn), c.hash) == DescStore.Status.DA_RIVEDERE ? 0 : 1)
@@ -525,6 +853,7 @@ final class DocBuilder {
             if (s == DescStore.Status.DA_RIVEDERE) sb.append("\nDescrizione attuale da aggiornare:\n\n> ").append(desc.text(key).replace("\n", "\n> ")).append('\n');
             items.add(sb.toString());
         }
+        }
         int total = items.size();
         if (max > 0 && items.size() > max) items = items.subList(0, max);
 
@@ -540,6 +869,7 @@ final class DocBuilder {
         out.append("i metodi principali e cosa fanno dal punto di vista funzionale, quali dati legge e scrive e in quali casi, ");
         out.append("eventuali regole di business o casi particolari che si capiscono dal codice. ");
         out.append("Per una tabella spiega: cosa rappresenta un suo record, il significato delle colonne meno ovvie (codici, flag, stati e i loro valori), come si collega alle altre tabelle.\n");
+        out.append("Per una SCHERMATA scrivi per il manuale utente, rivolgendoti a chi usa il programma e non lo conosce: a cosa serve e quando si usa, come si compila (campi importanti, obbligatori, controlli e regole che si capiscono dal codice), cosa fa ogni comando, cosa significano i messaggi e cosa fare. Niente nomi di classi, tabelle o termini tecnici. Usa titoletti brevi ed elenchi.\n");
         out.append("Non inventare: se qualcosa non si capisce dal codice, scrivi che va chiarito. Per gli elementi DA RIVEDERE parti dalla descrizione attuale e correggi solo quello che il codice nuovo ha cambiato.\n\n");
         if (desc.overview == null) {
             out.append("Se riesci, scrivi anche `").append(descDir).append("/_applicazione.md` (senza riga hash): una panoramica di una pagina su cosa fa l'applicazione, i suoi moduli e i punti di ingresso.\n\n");
@@ -553,6 +883,10 @@ final class DocBuilder {
     /** Elenco chiavi da rivedere con la loro impronta attuale (per il comando conferma). */
     Map<String, String> staleKeys() {
         Map<String, String> m = new TreeMap<>();
+        for (Screen sc : userScreens()) {
+            String k = DescStore.screenKey(sc.id);
+            if (desc.status(k, sc.hash) == DescStore.Status.DA_RIVEDERE) m.put(k, sc.hash);
+        }
         for (ClassInfo c : project.classes.values()) {
             String k = DescStore.classKey(c.fqcn);
             if (desc.status(k, c.hash) == DescStore.Status.DA_RIVEDERE) m.put(k, c.hash);

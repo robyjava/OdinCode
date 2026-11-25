@@ -34,12 +34,16 @@ Il consiglio è tenere un file per cliente, ad esempio `acme.properties`, fuori 
 - **titolo**: titolo del documento, per esempio il nome dell'applicazione.
 - **cliente**: nome del cliente, compare in copertina e a piè di pagina.
 - **descrizioni**: cartella delle descrizioni funzionali. Se non la indichi usa `descrizioni` nella cartella da cui lanci il comando.
-- **output**: il PDF da creare. Se non lo indichi crea `documentazione.pdf`.
+- **output**: nome base dei manuali. Da `manuale.pdf` nascono `manuale-utente.pdf` e `manuale-programmatore.pdf`. Se non lo indichi usa `manuale.pdf` nella cartella da cui lanci il comando.
+- **output.utente**, **output.programmatore**: per dare ai due manuali percorsi diversi da quelli automatici.
 - **pacchetto**: il file per l'AI creato dal comando `pacchetto`. Se non lo indichi crea `da-descrivere.md`.
 
 ### Facoltativi
 
 - **ddl.estensioni**: estensioni in più da leggere come DDL, separate da virgola (es. `txt,out`). Di default legge già `.sql .ddl .plsql .pls .plb .pck .pkg .pks .pkb .spc .bdy .prc .fnc .trg .typ .tps .tpb .vw .view .mv .tab .seq .idx .con .syn .grt`, in tutte le sottocartelle e anche in UTF-16. A video ti dice quanti file ha letto e quali ha scartato.
+- **web**: cartella (o più cartelle con `;`) con le pagine JSP/HTML. Se non la indichi cerca da solo `webapp`, `WebContent`, `WebRoot`, `web` vicino ai sorgenti. Legge anche `web.xml` e `struts-config*.xml` per capire a quale servlet va ogni modulo.
+- **risorse**: cartelle in più con i file `.properties` dei testi (etichette e messaggi). Di default legge quelli nei sorgenti e nella cartella `resources` accanto.
+- **pacchetto.manuale**: `utente`, `programmatore` o `tutti` (predefinito): quali descrizioni mettere nel pacchetto per l'AI.
 - **pacchetto.max**: quanti elementi al massimo per pacchetto. `0` significa tutti. Utile per far lavorare l'AI a rate.
 - **includi.test**: `true` per leggere anche le cartelle `/test/`. Normalmente `false`.
 
@@ -72,7 +76,7 @@ Nei file `.properties` la barra rovesciata `\` è un carattere speciale. Usa la 
    java -jar odin-doc.jar genera acme.properties
    ```
    A video vedi quante tabelle e quante query ha trovato.
-3. Apri il PDF e guarda soprattutto il capitolo 7, **Punti di attenzione**. La sezione *Avvisi di lettura dei sorgenti* dice se qualche file non è stato capito.
+3. Apri i due manuali. Nel manuale del programmatore guarda soprattutto il capitolo 8, **Punti di attenzione**. La sezione *Avvisi di lettura dei sorgenti* dice se qualche file non è stato capito.
 4. Se la base ti convince, aggiungi il database (vedi `02-con-database.properties`) e rilancia.
 
 ## 5. Le descrizioni con l'AI
@@ -85,11 +89,11 @@ Nei file `.properties` la barra rovesciata `\` è un carattere speciale. Usa la 
 2. Apri Claude Code (Claudia) nella cartella del cliente e scrivi: *"esegui le istruzioni del file da-descrivere.md"*. Scriverà i file nella cartella `descrizioni/`.
 3. Rilancia `genera`: le descrizioni entrano nel PDF.
 
-Se il pacchetto è grosso, metti `pacchetto.max=30` e ripeti i punti 1-3 finché il capitolo 8 non è vuoto.
+Se il pacchetto è grosso, metti `pacchetto.max=30` e ripeti i punti 1-3 finché il capitolo 9 del manuale del programmatore non è vuoto.
 
 ## 6. Quando il codice del cliente cambia
 
-1. `genera`: il capitolo 8 elenca le descrizioni **da rivedere**, cioè quelle il cui codice è cambiato.
+1. `genera`: il capitolo 9 del manuale del programmatore elenca le descrizioni **da rivedere**, cioè quelle il cui codice è cambiato.
 2. Se la modifica non cambia il senso, per esempio è un bug fix:
    ```
    java -jar odin-doc.jar conferma acme.properties NomeClasse
