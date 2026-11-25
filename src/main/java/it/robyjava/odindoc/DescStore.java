@@ -34,6 +34,7 @@ final class DescStore {
         if (Files.exists(ov)) overview = Util.read(ov).trim();
         load("classi");
         load("tabelle");
+        load("utente");
     }
 
     private void load(String sub) throws IOException {
@@ -64,6 +65,11 @@ final class DescStore {
     static String classKey(String fqcn) { return "classi/" + fqcn; }
 
     static String tableKey(String table) { return "tabelle/" + table; }
+
+    /** swing/it.x.Finestra -> utente/swing_it.x.Finestra ; web/ordini/lista.jsp -> utente/web_ordini_lista.jsp */
+    static String screenKey(String id) { return "utente/" + id.replaceAll("[/\\\\:]", "_"); }
+
+    static final String USER_INTRO = "utente/_introduzione";
 
     Entry get(String key) { return entries.get(key); }
 

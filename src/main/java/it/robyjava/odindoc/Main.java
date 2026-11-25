@@ -19,7 +19,7 @@ import java.util.*;
  */
 public final class Main {
 
-    static final String VERSION = "1.1";
+    static final String VERSION = "1.2";
 
     public static void main(String[] args) {
         try {
@@ -71,27 +71,37 @@ public final class Main {
             System.out.println("  ATTENZIONE: file letti ma nessuna CREATE TABLE riconosciuta. Mandami le prime righe di uno script.");
         if (!schema.warnings.isEmpty()) System.out.println("  " + schema.warnings.size() + " istruzioni non interpretate (elenco nel capitolo 7 del PDF)");
         System.out.println("Leggo i sorgenti Java da " + src + " ...");
-        Project project = new JavaAnalyzer(schema).analyze(paths(src), tests);
+        JavaAnalyzer ja = new JavaAnalyzer(schema);
+        ja.project().bundle.putAll(UiAnalyzer.loadBundles(paths(src), paths(cfg.getProperty("risorse", ""))));
+        Project project = ja.analyze(paths(src), tests);
         long q = project.allMethods().stream().mapToInt(m -> m.sql.size()).sum();
         System.out.println("  " + project.classes.size() + " classi, " + q + " query individuate");
+        UiAnalyzer ui = new UiAnalyzer(ja, schema);
+        ui.swing();
+        long swing = project.screens.keySet().stream().filter(k -> k.startsWith("swing/")).count();
+        System.out.println("Cerco l'interfaccia utente ...");
+        ui.web(paths(cfg.getProperty("web", "")), paths(src));
+        System.out.println("  " + swing + " schermate Swing, " + (project.screens.size() - swing) + " pagine web"
+                + (project.bundle.isEmpty() ? "" : ", " + project.bundle.size() + " testi dai file .properties"));
         DescStore desc = new DescStore(Paths.get(descDir));
 
         switch (cmd) {
             case "genera": {
                 profile(cfg, schema);
-                String out = cfg.getProperty("output", "documentazione.pdf");
-                byte[] pdf = new DocBuilder(schema, project, desc, title, client).pdf();
-                Path p = Paths.get(out);
-                if (p.getParent() != null) Files.createDirectories(p.getParent());
-                Files.write(p, pdf);
-                System.out.println("PDF creato: " + p.toAbsolutePath() + " (" + pdf.length / 1024 + " KB)");
+                String base = cfg.getProperty("output", "manuale.pdf").replaceAll("(?i)\\.pdf$", "");
+                String outProg = cfg.getProperty("output.programmatore", base + "-programmatore.pdf");
+                String outUser = cfg.getProperty("output.utente", base + "-utente.pdf");
+                DocBuilder db = new DocBuilder(schema, project, desc, title, client);
+                write(outProg, db.pdf(), "Manuale del programmatore");
+                if (!db.userScreens().isEmpty()) write(outUser, db.userPdf(), "Manuale utente");
+                else System.out.println("Manuale utente non creato: nessuna schermata Swing o pagina web trovata (vedi il parametro web=).");
                 return 0;
             }
             case "pacchetto": {
                 profile(cfg, schema);
                 int max = Integer.parseInt(cfg.getProperty("pacchetto.max", "0"));
                 String out = cfg.getProperty("pacchetto", "da-descrivere.md");
-                String md = new DocBuilder(schema, project, desc, title, client).packageForAi(max, descDir.replace('\\', '/'));
+                String md = new DocBuilder(schema, project, desc, title, client).packageForAi(max, descDir.replace('\\', '/'), cfg.getProperty("pacchetto.manuale", "tutti"));
                 Files.write(Paths.get(out), md.getBytes(StandardCharsets.UTF_8));
                 System.out.println("Pacchetto per l'AI creato: " + Paths.get(out).toAbsolutePath() + " (" + md.length() / 1024 + " KB, circa " + md.length() / 4 / 1000 + "k token)");
                 return 0;
@@ -130,6 +140,13 @@ public final class Main {
         new DataProfiler(cfg.getProperty("db.driver.jar"), url, user, pwd,
                 Long.parseLong(cfg.getProperty("db.soglia.righe", "2000000")), exclude,
                 Integer.parseInt(cfg.getProperty("db.timeout", "60"))).profile(schema);
+    }
+
+    private static void write(String out, byte[] pdf, String what) throws java.io.IOException {
+        Path p = Paths.get(out);
+        if (p.getParent() != null) Files.createDirectories(p.getParent());
+        Files.write(p, pdf);
+        System.out.println(what + ": " + p.toAbsolutePath() + " (" + pdf.length / 1024 + " KB)");
     }
 
     private static List<Path> paths(String s) {

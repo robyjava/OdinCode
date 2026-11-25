@@ -2,9 +2,12 @@
 
 ## In breve
 
-OdinDoc legge il database e il codice Java di un'applicazione e scrive da solo un PDF che spiega com'è fatta.
+OdinDoc legge il database e il codice Java di un'applicazione e scrive da solo **due manuali in PDF**:
 
-Tu gli dai **due cartelle** e lui ti restituisce **un PDF**. Non serve altro.
+- il **manuale utente**: le schermate (finestre Swing e pagine web), i campi, i comandi, i messaggi, come ci si muove
+- il **manuale del programmatore**: com'è fatto il codice, le query, il database, chi usa cosa
+
+Tu gli dai **due cartelle** e lui ti restituisce i due PDF. Non serve altro.
 
 ---
 
@@ -43,7 +46,7 @@ titolo=Gestione Vendite
 cliente=ACME S.p.A.
 ddl=C:/clienti/acme/db
 src=C:/clienti/acme/progetto/src/main/java
-output=C:/odindoc/acme/documentazione.pdf
+output=C:/odindoc/acme/manuale.pdf
 descrizioni=C:/odindoc/acme/descrizioni
 pacchetto=C:/odindoc/acme/da-descrivere.md
 ```
@@ -54,7 +57,7 @@ Cosa vuol dire ogni riga:
 - **cliente**: il nome del cliente, va in copertina.
 - **ddl**: la cartella con gli script del database.
 - **src**: la cartella con i sorgenti Java.
-- **output**: dove salvare il PDF.
+- **output**: dove salvare i manuali. Da `manuale.pdf` nascono `manuale-utente.pdf` e `manuale-programmatore.pdf`.
 - **descrizioni**: dove tenere le spiegazioni scritte dall'AI. Per ora ignorala, la usi più avanti.
 - **pacchetto**: il file da dare all'AI. Anche questa per ora ignorala.
 
@@ -82,31 +85,49 @@ Leggo le DDL da C:/clienti/acme/db ...
   120 tabelle, 8 viste, 3 oggetti PL/SQL
 Leggo i sorgenti Java da C:/clienti/acme/progetto/src/main/java ...
   340 classi, 512 query individuate
-PDF creato: C:\odindoc\acme\documentazione.pdf
+Cerco l'interfaccia utente ...
+  45 schermate Swing, 30 pagine web, 820 testi dai file .properties
+Manuale del programmatore: C:\odindoc\acme\manuale-programmatore.pdf
+Manuale utente: C:\odindoc\acme\manuale-utente.pdf
 ```
 
-Apri il PDF. **Questo è già il risultato.**
+Apri i due PDF. **Questo è già il risultato.**
+
+Le pagine JSP/HTML le cerca da solo nelle cartelle `webapp`, `WebContent`, `WebRoot` vicino ai sorgenti. Se sono altrove, aggiungi la riga `web=C:/percorso/delle/pagine`.
 
 ---
 
-## Cosa trovi nel PDF
+## Cosa trovi nel manuale utente
+
+1. **Introduzione**: a cosa serve l'applicazione.
+2. **Come ci si muove**: i menu e i collegamenti tra pagine.
+3. **Le schermate**: per ognuna i campi, i comandi con quello che fanno ("Salva: registra l'ordine"), gli elenchi e i messaggi che possono comparire. In fondo a ogni schermata c'è un riquadro grigio per il supporto, con la classe e i dati coinvolti.
+4. **Glossario dei codici**: il significato di stati e flag.
+5. **Indice dei messaggi**: tutti i messaggi, con la schermata in cui compaiono.
+
+Senza l'AI ogni schermata ha già campi, comandi e messaggi. Con le descrizioni dell'AI (vedi sotto) diventa un manuale completo.
+
+## Cosa trovi nel manuale del programmatore
 
 1. **Panoramica**: i numeri dell'applicazione.
 2. **Architettura**: tutte le classi, divise per package.
-3. **Punti di ingresso**: da dove parte il programma (main, servlet, batch) e quali tabelle tocca.
-4. **Componenti**: una scheda per ogni classe, con i metodi e le query SQL che usa.
-5. **Base dati**: una scheda per ogni tabella, con le colonne, le relazioni e chi la usa.
-6. **Matrice CRUD**: chi legge e chi scrive ogni tabella.
-7. **Punti di attenzione**: cose da controllare, per esempio tabelle mai usate o query a rischio.
-8. **Stato delle descrizioni**: quali spiegazioni mancano (vedi sotto).
+3. **Interfaccia utente**: per ogni schermata, i comandi, i metodi che li gestiscono e le tabelle che toccano.
+4. **Punti di ingresso**: da dove parte il programma (main, servlet, batch) e quali tabelle tocca.
+5. **Componenti**: una scheda per ogni classe, con i metodi e le query SQL che usa.
+6. **Base dati**: una scheda per ogni tabella, con le colonne, le relazioni e chi la usa.
+7. **Matrice CRUD**: chi legge e chi scrive ogni tabella.
+8. **Punti di attenzione**: cose da controllare, per esempio tabelle mai usate o query a rischio.
+9. **Stato delle descrizioni**: quali spiegazioni mancano (vedi sotto).
 
-Ogni volta che il codice del cliente cambia, rilanci lo stesso comando e il PDF si aggiorna.
+Ogni volta che il codice del cliente cambia, rilanci lo stesso comando e i manuali si aggiornano.
 
 ---
 
 ## Facoltativo: le spiegazioni scritte dall'AI
 
-Il PDF descrive **com'è fatto** il programma, ma non spiega **a cosa serve** ogni classe con parole umane. Per quello si usa l'AI, una volta sola.
+I manuali descrivono **com'è fatto** il programma, ma non spiegano con parole umane **a cosa serve** ogni schermata o classe. Per quello si usa l'AI, una volta sola.
+
+Il pacchetto contiene sia le schermate (per il manuale utente) sia le classi e le tabelle (per il manuale del programmatore). Per farne uno solo aggiungi `pacchetto.manuale=utente` oppure `pacchetto.manuale=programmatore`.
 
 **Passo 1.** Prepara il materiale per l'AI:
 
@@ -122,11 +143,11 @@ Crea il file `C:\odindoc\acme\da-descrivere.md`, che contiene solo le cose ancor
 
 Claude scrive le spiegazioni nella cartella `C:\odindoc\acme\descrizioni`.
 
-**Passo 3.** Rilancia `genera`: ora il PDF contiene anche le spiegazioni.
+**Passo 3.** Rilancia `genera`: ora i manuali contengono anche le spiegazioni.
 
 ### Quando il codice cambia
 
-Il programma si accorge da solo di quali classi sono cambiate e le segna come **da rivedere** nel capitolo 8.
+Il programma si accorge da solo di quali classi e schermate sono cambiate e le segna come **da rivedere** nel capitolo 9 del manuale del programmatore.
 
 - Se la modifica è piccola e la spiegazione va ancora bene:
   ```
@@ -163,7 +184,7 @@ db.escludi=ANAGRAFICA_PERSONE,DOCUMENTI
 ## I tre comandi in sintesi
 
 ```
-java -jar odin-doc.jar genera    acme.properties     crea il PDF
+java -jar odin-doc.jar genera    acme.properties     crea i due manuali
 java -jar odin-doc.jar pacchetto acme.properties     prepara il materiale per l'AI
 java -jar odin-doc.jar conferma  acme.properties     segna come ancora valide le spiegazioni
 ```
@@ -176,6 +197,6 @@ java -jar odin-doc.jar conferma  acme.properties     segna come ancora valide le
 - **"Manca il parametro 'ddl'"**: nel file `.properties` manca la riga `ddl=`, oppure hai scritto male il nome del file.
 - **"0 tabelle"**: guarda la riga *file non letti*: se gli script hanno un'estensione particolare, aggiungila con `ddl.estensioni=` nel file `.properties`.
 - **"Cartella inesistente"**: il percorso è sbagliato. Controlla di aver usato la barra `/`.
-- **Una query che sai esserci non compare nel PDF**: annota la classe e il metodo e segnalalo, così si migliora il programma.
+- **Una schermata o una query che sai esserci non compare**: annota la classe e il metodo e segnalalo, così si migliora il programma.
 
 Per i dettagli su tutti i parametri vedi `docs/CONFIGURAZIONE.md`.

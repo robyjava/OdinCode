@@ -107,12 +107,14 @@ public final class Model {
 
     public static final class RawCall {
         final String name, typeHint;
+        /** -1 = numero di argomenti sconosciuto (riferimento a metodo) */
         final int argc;
         RawCall(String name, int argc, String typeHint) { this.name = name; this.argc = argc; this.typeHint = typeHint; }
     }
 
     public static final class MethodInfo {
         String name, signature, javadoc, entryKind;
+        final List<String> webPaths = new ArrayList<>();
         int line, lines, argc;
         ClassInfo owner;
         final List<SqlUse> sql = new ArrayList<>();
@@ -132,6 +134,8 @@ public final class Model {
         final List<String> annotations = new ArrayList<>();
         final Map<String, String> fieldTypes = new HashMap<>();
         final List<MethodInfo> methods = new ArrayList<>();
+        /** percorsi web dichiarati (@WebServlet, @Path, @RequestMapping sulla classe) */
+        final List<String> webPaths = new ArrayList<>();
         String source;
 
         boolean hasSql() {
@@ -140,10 +144,50 @@ public final class Model {
         }
     }
 
+    // ---------------------------------------------------------------- interfaccia utente
+
+    public static final class UiField {
+        String label, name, kind;
+    }
+
+    public static final class UiAction {
+        String label, kind, var;
+        final List<RawCall> raw = new ArrayList<>();
+        final Set<MethodInfo> targets = new LinkedHashSet<>();
+        final Map<String, Set<Character>> directTables = new TreeMap<>();
+        /** schermate aperte dall'azione (id) */
+        final Set<String> opens = new TreeSet<>();
+        String url;
+        boolean closes;
+    }
+
+    public static final class MenuNode {
+        String label, var;
+        UiAction action;
+        final List<MenuNode> children = new ArrayList<>();
+    }
+
+    /** Una schermata: finestra/pannello Swing oppure pagina web. */
+    public static final class Screen {
+        String id, kind, title, file, hash, source;
+        ClassInfo cls;
+        final List<String> headings = new ArrayList<>();
+        final List<UiField> fields = new ArrayList<>();
+        final List<UiAction> actions = new ArrayList<>();
+        final Set<String> messages = new LinkedHashSet<>();
+        final List<List<String>> columns = new ArrayList<>();
+        final Set<String> links = new TreeSet<>();
+        final List<MenuNode> menus = new ArrayList<>();
+        final Set<String> linkedFrom = new TreeSet<>();
+    }
+
     public static final class Project {
         final Map<String, ClassInfo> classes = new TreeMap<>();
         final List<String> parseErrors = new ArrayList<>();
-        int files;
+        final Map<String, Screen> screens = new TreeMap<>();
+        /** testi dei file .properties (bundle delle etichette) */
+        final Map<String, String> bundle = new HashMap<>();
+        int files, webFiles;
 
         List<MethodInfo> allMethods() {
             List<MethodInfo> l = new ArrayList<>();

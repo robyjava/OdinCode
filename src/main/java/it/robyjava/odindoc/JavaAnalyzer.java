@@ -39,10 +39,16 @@ final class JavaAnalyzer {
     private final Map<String, List<String>> constBySimpleName = new HashMap<>();
     private final Set<String> evaluating = new HashSet<>();
     private final Map<String, String> typeSuper = new HashMap<>();
+    /** AST delle classi, per l'analisi dell'interfaccia dopo il passo 2 */
+    final Map<ClassInfo, TypeDeclaration<?>> ast = new LinkedHashMap<>();
+    private Map<String, List<ClassInfo>> bySimple;
+    private Map<String, List<MethodInfo>> byName;
 
     JavaAnalyzer(Schema schema) {
         this.schema = schema;
     }
+
+    Project project() { return project; }
 
     Project analyze(List<Path> roots, boolean includeTests) throws IOException {
         List<Path> files = Util.files(roots, Collections.singleton("java"), includeTests);
@@ -93,6 +99,7 @@ final class JavaAnalyzer {
                 if (td.getParentNode().isPresent() && td.getParentNode().get() instanceof ObjectCreationExpr) continue;
                 ClassInfo ci = classInfo(td, pkg, unitFiles.get(i), unitSrc.get(i));
                 project.classes.put(ci.fqcn, ci);
+                ast.put(ci, td);
             }
         }
         resolveCalls();
@@ -125,7 +132,10 @@ final class JavaAnalyzer {
             }
             c.getImplementedTypes().forEach(t -> ci.interfaces.add(t.getNameAsString()));
         }
-        td.getAnnotations().forEach(a -> ci.annotations.add(a.getNameAsString()));
+        td.getAnnotations().forEach(a -> {
+            ci.annotations.add(a.getNameAsString());
+            if (WEB_PATH_ANNOTATIONS.contains(a.getNameAsString())) ci.webPaths.addAll(annotationStrings(a));
+        });
         for (FieldDeclaration fd : td.getFields())
             for (VariableDeclarator vd : fd.getVariables()) ci.fieldTypes.put(vd.getNameAsString(), simpleType(vd.getType().asString()));
 
@@ -159,6 +169,8 @@ final class JavaAnalyzer {
         m.line = cd.getRange().map(r -> r.begin.line).orElse(0);
         m.lines = cd.getRange().map(r -> r.end.line - r.begin.line + 1).orElse(0);
         m.entryKind = entryKind(cd, ci);
+        for (AnnotationExpr a : cd.getAnnotations())
+            if (WEB_PATH_ANNOTATIONS.contains(a.getNameAsString())) m.webPaths.addAll(annotationStrings(a));
 
         BlockStmt body = null;
         if (cd instanceof MethodDeclaration) body = ((MethodDeclaration) cd).getBody().orElse(null);
@@ -266,6 +278,29 @@ final class JavaAnalyzer {
         return null;
     }
 
+    private static final Set<String> WEB_PATH_ANNOTATIONS = new HashSet<>(Arrays.asList(
+            "WebServlet", "Path", "RequestMapping", "GetMapping", "PostMapping", "PutMapping", "DeleteMapping", "PatchMapping"));
+
+    /** Valori stringa di un'annotazione: @X("a"), @X(value="a"), @X(urlPatterns={"a","b"}), @X(path=...). */
+    private List<String> annotationStrings(AnnotationExpr a) {
+        List<String> out = new ArrayList<>();
+        List<Expression> vals = new ArrayList<>();
+        if (a instanceof SingleMemberAnnotationExpr) vals.add(((SingleMemberAnnotationExpr) a).getMemberValue());
+        else if (a instanceof NormalAnnotationExpr)
+            for (MemberValuePair p : ((NormalAnnotationExpr) a).getPairs())
+                if (Arrays.asList("value", "urlPatterns", "path").contains(p.getNameAsString())) vals.add(p.getValue());
+        for (Expression v : vals) {
+            List<Expression> items = new ArrayList<>();
+            if (v instanceof ArrayInitializerExpr) items.addAll(((ArrayInitializerExpr) v).getValues());
+            else items.add(v);
+            for (Expression it : items) {
+                String t = eval(it, null);
+                if (t.indexOf(Util.DYN) < 0 && !t.isEmpty()) out.add(t);
+            }
+        }
+        return out;
+    }
+
     private String entryKind(CallableDeclaration<?> cd, ClassInfo ci) {
         String n = cd.getNameAsString();
         if (cd instanceof MethodDeclaration) {
@@ -347,6 +382,12 @@ final class JavaAnalyzer {
             if (PASS_THROUGH.contains(n) && sc.isPresent()) return eval(sc.get(), ctx);
             if (n.equals("append") && sc.isPresent() && mc.getArguments().size() == 1) return eval(sc.get(), ctx) + eval(mc.getArgument(0), ctx);
             if (n.equals("concat") && sc.isPresent() && mc.getArguments().size() == 1) return eval(sc.get(), ctx) + eval(mc.getArgument(0), ctx);
+            if ((n.equals("getString") || n.equals("getMessage") || n.equals("getText") || n.equals("get") || n.equals("message") || n.equals("msg"))
+                    && mc.getArguments().size() >= 1 && mc.getArgument(0) instanceof StringLiteralExpr) {
+                String key = ((StringLiteralExpr) mc.getArgument(0)).asString();
+                String v = project.bundle.get(key);
+                if (v != null) return v;
+            }
             if (n.equals("format") && sc.isPresent() && sc.get().toString().equals("String") && mc.getArguments().size() > 0)
                 return eval(mc.getArgument(0), ctx).replaceAll("%[-0-9.]*[sdfx]", D);
             return D;
@@ -363,6 +404,16 @@ final class JavaAnalyzer {
             return D;
         }
         return D;
+    }
+
+    /** Valuta un'espressione stringa nel contesto di una classe (per l'analisi dell'interfaccia). */
+    String evalIn(Expression e, ClassInfo cls) {
+        return eval(e, new Ctx(cls));
+    }
+
+    /** Chiamata grezza con indizio sul tipo del destinatario, nel contesto di una classe. */
+    Model.RawCall rawCall(MethodCallExpr mc, ClassInfo cls) {
+        return new Model.RawCall(mc.getNameAsString(), mc.getArguments().size(), typeHint(mc, new Ctx(cls)));
     }
 
     /** Risolve una costante per nome semplice partendo dalla classe corrente, poi superclassi, poi nome unico nel progetto. */
@@ -409,48 +460,53 @@ final class JavaAnalyzer {
     // ------------------------------------------------------------ grafo delle chiamate
 
     private void resolveCalls() {
-        Map<String, List<ClassInfo>> bySimple = new HashMap<>();
-        Map<String, List<MethodInfo>> byName = new HashMap<>();
+        bySimple = new HashMap<>();
+        byName = new HashMap<>();
         for (ClassInfo c : project.classes.values()) {
             bySimple.computeIfAbsent(c.name, k -> new ArrayList<>()).add(c);
-            for (MethodInfo m : c.methods) byName.computeIfAbsent(m.name + "#" + m.argc, k -> new ArrayList<>()).add(m);
-        }
-        for (ClassInfo c : project.classes.values()) {
             for (MethodInfo m : c.methods) {
-                for (Model.RawCall rc : m.rawCalls) {
-                    List<MethodInfo> targets = new ArrayList<>();
-                    if ("this".equals(rc.typeHint)) {
-                        find(c, rc, bySimple, targets, new HashSet<>(), false);
-                    } else if ("super".equals(rc.typeHint)) {
-                        if (c.superName != null && bySimple.containsKey(c.superName))
-                            for (ClassInfo s : bySimple.get(c.superName)) find(s, rc, bySimple, targets, new HashSet<>(), false);
-                    } else if (rc.typeHint != null) {
-                        if (bySimple.containsKey(rc.typeHint)) {
-                            for (ClassInfo t : bySimple.get(rc.typeHint)) {
-                                find(t, rc, bySimple, targets, new HashSet<>(), false);
-                                // interfaccia o classe astratta: anche le implementazioni
-                                for (ClassInfo impl : project.classes.values())
-                                    if (impl.interfaces.contains(t.name) || t.name.equals(impl.superName)) find(impl, rc, bySimple, targets, new HashSet<>(), true);
-                            }
-                        }
-                    } else {
-                        List<MethodInfo> l = byName.get(rc.name + "#" + rc.argc);
-                        if (l != null && l.size() == 1) targets.add(l.get(0));
-                    }
-                    for (MethodInfo t : targets) {
+                byName.computeIfAbsent(m.name + "#" + m.argc, k -> new ArrayList<>()).add(m);
+                byName.computeIfAbsent(m.name + "#-1", k -> new ArrayList<>()).add(m);
+            }
+        }
+        for (ClassInfo c : project.classes.values())
+            for (MethodInfo m : c.methods)
+                for (Model.RawCall rc : m.rawCalls)
+                    for (MethodInfo t : resolve(c, rc)) {
                         if (t == m) continue;
                         m.calls.add(t);
                         t.calledBy.add(m);
                     }
+    }
+
+    /** Metodi del progetto che una chiamata può raggiungere. */
+    List<MethodInfo> resolve(ClassInfo c, Model.RawCall rc) {
+        List<MethodInfo> targets = new ArrayList<>();
+        if ("this".equals(rc.typeHint)) {
+            find(c, rc, bySimple, targets, new HashSet<>(), false);
+        } else if ("super".equals(rc.typeHint)) {
+            if (c.superName != null && bySimple.containsKey(c.superName))
+                for (ClassInfo s : bySimple.get(c.superName)) find(s, rc, bySimple, targets, new HashSet<>(), false);
+        } else if (rc.typeHint != null) {
+            if (bySimple.containsKey(rc.typeHint)) {
+                for (ClassInfo t : bySimple.get(rc.typeHint)) {
+                    find(t, rc, bySimple, targets, new HashSet<>(), false);
+                    // interfaccia o classe astratta: anche le implementazioni
+                    for (ClassInfo impl : project.classes.values())
+                        if (impl.interfaces.contains(t.name) || t.name.equals(impl.superName)) find(impl, rc, bySimple, targets, new HashSet<>(), true);
                 }
             }
+        } else {
+            List<MethodInfo> l = byName.get(rc.name + "#" + rc.argc);
+            if (l != null && l.size() == 1) targets.add(l.get(0));
         }
+        return targets;
     }
 
     private void find(ClassInfo c, Model.RawCall rc, Map<String, List<ClassInfo>> bySimple, List<MethodInfo> out, Set<ClassInfo> seen, boolean onlyOwn) {
         if (!seen.add(c)) return;
         boolean found = false;
-        for (MethodInfo m : c.methods) if (m.name.equals(rc.name) && m.argc == rc.argc) { out.add(m); found = true; }
+        for (MethodInfo m : c.methods) if (m.name.equals(rc.name) && (rc.argc < 0 || m.argc == rc.argc)) { out.add(m); found = true; }
         if (found || onlyOwn) return;
         if (c.superName != null && bySimple.containsKey(c.superName))
             for (ClassInfo s : bySimple.get(c.superName)) find(s, rc, bySimple, out, seen, false);
