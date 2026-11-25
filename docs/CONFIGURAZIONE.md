@@ -39,6 +39,7 @@ Il consiglio è tenere un file per cliente, ad esempio `acme.properties`, fuori 
 
 ### Facoltativi
 
+- **ddl.estensioni**: estensioni in più da leggere come DDL, separate da virgola (es. `txt,out`). Di default legge già `.sql .ddl .plsql .pls .plb .pck .pkg .pks .pkb .spc .bdy .prc .fnc .trg .typ .tps .tpb .vw .view .mv .tab .seq .idx .con .syn .grt`, in tutte le sottocartelle e anche in UTF-16. A video ti dice quanti file ha letto e quali ha scartato.
 - **pacchetto.max**: quanti elementi al massimo per pacchetto. `0` significa tutti. Utile per far lavorare l'AI a rate.
 - **includi.test**: `true` per leggere anche le cartelle `/test/`. Normalmente `false`.
 

@@ -19,7 +19,7 @@ import java.util.*;
  */
 public final class Main {
 
-    static final String VERSION = "1.0";
+    static final String VERSION = "1.1";
 
     public static void main(String[] args) {
         try {
@@ -56,8 +56,20 @@ public final class Main {
 
         System.out.println("OdinDoc " + VERSION);
         System.out.println("Leggo le DDL da " + ddl + " ...");
-        Schema schema = new DdlParser().parse(paths(ddl), tests);
+        Set<String> extraExt = new HashSet<>();
+        for (String e : cfg.getProperty("ddl.estensioni", "").split("[,;\\s]+"))
+            if (!e.isEmpty()) extraExt.add(e.replace(".", "").toLowerCase(Locale.ROOT));
+        Schema schema = new DdlParser().parse(paths(ddl), tests, extraExt);
+        System.out.println("  letti " + schema.files + " file, " + schema.statements + " istruzioni");
         System.out.println("  " + schema.tables.size() + " tabelle, " + schema.views.size() + " viste, " + schema.routines.size() + " oggetti PL/SQL");
+        if (!schema.skipped.isEmpty()) {
+            StringBuilder sk = new StringBuilder("  file non letti: ");
+            schema.skipped.forEach((k, v) -> sk.append(v).append(' ').append(k).append("; "));
+            System.out.println(sk + "se sono DDL aggiungi l'estensione con ddl.estensioni=...");
+        }
+        if (schema.files > 0 && schema.tables.isEmpty())
+            System.out.println("  ATTENZIONE: file letti ma nessuna CREATE TABLE riconosciuta. Mandami le prime righe di uno script.");
+        if (!schema.warnings.isEmpty()) System.out.println("  " + schema.warnings.size() + " istruzioni non interpretate (elenco nel capitolo 7 del PDF)");
         System.out.println("Leggo i sorgenti Java da " + src + " ...");
         Project project = new JavaAnalyzer(schema).analyze(paths(src), tests);
         long q = project.allMethods().stream().mapToInt(m -> m.sql.size()).sum();
