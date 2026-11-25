@@ -12,7 +12,7 @@ Tu gli dai **due cartelle** e lui ti restituisce **un PDF**. Non serve altro.
 
 Al programma servono solo due cose, che hai già nel progetto del cliente:
 
-1. **La cartella con gli script del database**: i file `.sql` con i `CREATE TABLE`, le viste, i trigger e così via. Basta la cartella, con dentro anche sottocartelle.
+1. **La cartella con gli script del database**: i file `.sql`, `.plsql`, `.pks`/`.pkb` e simili con i `CREATE TABLE`, le viste, i trigger e così via. Basta la cartella: il programma entra da solo in tutte le sottocartelle.
 2. **La cartella con i sorgenti Java**: di solito è `src/main/java` del progetto.
 
 Non serve collegarsi al database, non serve l'AI e non serve internet.
@@ -76,8 +76,9 @@ java -jar odin-doc.jar genera acme.properties
 Dopo qualche secondo vedi qualcosa del genere:
 
 ```
-OdinDoc 1.0
+OdinDoc 1.1
 Leggo le DDL da C:/clienti/acme/db ...
+  letti 412 file, 1530 istruzioni
   120 tabelle, 8 viste, 3 oggetti PL/SQL
 Leggo i sorgenti Java da C:/clienti/acme/progetto/src/main/java ...
   340 classi, 512 query individuate
@@ -173,6 +174,7 @@ java -jar odin-doc.jar conferma  acme.properties     segna come ancora valide le
 
 - **"java non è riconosciuto"**: Java non è installato o non è nel PATH.
 - **"Manca il parametro 'ddl'"**: nel file `.properties` manca la riga `ddl=`, oppure hai scritto male il nome del file.
+- **"0 tabelle"**: guarda la riga *file non letti*: se gli script hanno un'estensione particolare, aggiungila con `ddl.estensioni=` nel file `.properties`.
 - **"Cartella inesistente"**: il percorso è sbagliato. Controlla di aver usato la barra `/`.
 - **Una query che sai esserci non compare nel PDF**: annota la classe e il metodo e segnalalo, così si migliora il programma.
 

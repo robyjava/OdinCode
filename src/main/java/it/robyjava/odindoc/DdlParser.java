@@ -11,8 +11,10 @@ import java.util.regex.Pattern;
 /** Legge gli script DDL Oracle e ricostruisce lo schema. Tollerante: quello che non capisce lo salta. */
 final class DdlParser {
 
-    private static final Set<String> EXT = new HashSet<>(Arrays.asList(
-            "sql", "ddl", "tab", "vw", "seq", "trg", "pks", "pkb", "pck", "prc", "fnc", "idx", "con"));
+    /** Estensioni lette di default: script SQL e sorgenti PL/SQL con i nomi usati da SQL Developer, Toad, PL/SQL Developer. */
+    static final Set<String> EXT = new TreeSet<>(Arrays.asList(
+            "sql", "ddl", "plsql", "pls", "plb", "pck", "pkg", "pks", "pkb", "spc", "bdy", "prc", "fnc", "trg",
+            "typ", "tps", "tpb", "vw", "view", "mv", "tab", "seq", "idx", "con", "syn", "grt"));
 
     private static final String ID = "((?:\"[^\"]+\"|[A-Za-z0-9_$#]+)(?:\\.(?:\"[^\"]+\"|[A-Za-z0-9_$#]+))?)";
     private static final Pattern CREATE_TABLE = Pattern.compile("^CREATE\\s+(?:GLOBAL\\s+TEMPORARY\\s+|PRIVATE\\s+TEMPORARY\\s+)?TABLE\\s+" + ID, Pattern.CASE_INSENSITIVE);
@@ -30,13 +32,17 @@ final class DdlParser {
             "NOT", "NULL", "DEFAULT", "CONSTRAINT", "PRIMARY", "REFERENCES", "UNIQUE", "CHECK", "ENABLE", "DISABLE",
             "GENERATED", "COLLATE", "VISIBLE", "INVISIBLE", "ENCRYPT", "SORT", "IDENTITY"));
 
-    Schema parse(List<Path> roots, boolean includeTests) throws IOException {
+    Schema parse(List<Path> roots, boolean includeTests, Set<String> extraExt) throws IOException {
         Schema s = new Schema();
-        List<Path> files = Util.files(roots, EXT, includeTests);
+        Set<String> ext = new TreeSet<>(EXT);
+        ext.addAll(extraExt);
+        List<Path> files = Util.files(roots, ext, includeTests);
         s.files = files.size();
+        s.skipped.putAll(Util.skippedExtensions(roots, ext, includeTests));
         for (Path f : files) {
             String text = Util.read(f);
             for (String st : split(text)) {
+                s.statements++;
                 try {
                     statement(s, st, f.getFileName().toString());
                 } catch (RuntimeException e) {

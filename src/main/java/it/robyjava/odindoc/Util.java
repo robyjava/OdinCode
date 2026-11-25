@@ -19,6 +19,15 @@ final class Util {
     /** Legge un file provando UTF-8 e ripiegando su Windows-1252 (tipico dei progetti italiani). */
     static String read(Path p) throws IOException {
         byte[] b = Files.readAllBytes(p);
+        // UTF-16 (tipico di alcuni export di SQL Developer e Toad): con BOM o riconosciuto dagli zeri alternati
+        if (b.length >= 2 && (b[0] & 0xff) == 0xFF && (b[1] & 0xff) == 0xFE) return new String(b, 2, b.length - 2, StandardCharsets.UTF_16LE);
+        if (b.length >= 2 && (b[0] & 0xff) == 0xFE && (b[1] & 0xff) == 0xFF) return new String(b, 2, b.length - 2, StandardCharsets.UTF_16BE);
+        if (b.length >= 4) {
+            int zeroOdd = 0, zeroEven = 0, n = Math.min(b.length, 2000);
+            for (int i = 0; i < n; i++) if (b[i] == 0) { if (i % 2 == 0) zeroEven++; else zeroOdd++; }
+            if (zeroOdd > n / 4 && zeroEven == 0) return new String(b, StandardCharsets.UTF_16LE);
+            if (zeroEven > n / 4 && zeroOdd == 0) return new String(b, StandardCharsets.UTF_16BE);
+        }
         try {
             return StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
@@ -42,6 +51,25 @@ final class Util {
                             return includeTests || !n.contains("/test/");
                         })
                         .sorted().collect(Collectors.toList()));
+            }
+        }
+        return out;
+    }
+
+    /** Conta per estensione i file presenti ma non letti, per dirlo chiaramente a video. */
+    static Map<String, Integer> skippedExtensions(List<Path> roots, Set<String> exts, boolean includeTests) throws IOException {
+        Map<String, Integer> out = new TreeMap<>();
+        for (Path root : roots) {
+            if (!Files.exists(root)) continue;
+            try (Stream<Path> s = Files.walk(root)) {
+                s.filter(Files::isRegularFile).forEach(p -> {
+                    String e = ext(p);
+                    String n = p.toString().replace('\\', '/');
+                    if (n.contains("/.git/")) return;
+                    if (!exts.contains(e)) out.merge(e.isEmpty() ? "(senza estensione)" : "." + e, 1, Integer::sum);
+                    else if (n.contains("/target/") || n.contains("/build/") || (!includeTests && n.contains("/test/")))
+                        out.merge("." + e + " in cartelle escluse (test, build, target)", 1, Integer::sum);
+                });
             }
         }
         return out;

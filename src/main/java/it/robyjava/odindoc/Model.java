@@ -83,7 +83,9 @@ public final class Model {
         final Map<String, Trigger> triggers = new TreeMap<>();
         final Map<String, Routine> routines = new TreeMap<>();
         final List<String> warnings = new ArrayList<>();
-        int files;
+        /** estensione -> numero di file non letti */
+        final Map<String, Integer> skipped = new TreeMap<>();
+        int files, statements;
 
         Table table(String n) { return tables.get(n); }
 
