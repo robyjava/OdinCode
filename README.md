@@ -1,5 +1,7 @@
 # OdinDoc
 
+> **Per iniziare leggi il [Manuale di utilizzo](MANUALE.md).**
+
 Genera la documentazione in PDF di un'applicazione partendo da:
 
 - gli **script DDL** Oracle (tutti in una cartella): tabelle, colonne, chiavi, indici, commenti, viste, sequence, trigger, package
